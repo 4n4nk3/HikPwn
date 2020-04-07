@@ -14,7 +14,7 @@ pip install -r requirements.txt
 
 ### Functions and characteristics:
  - [x] Passive discovery of Hikvision devices.
- - [x] Active discovery and enumeration of Hikvision devices via UDP probing.
+ - [x] Active discovery and enumeration of Hikvision devices via UDP UPNP probing.
 
  > Work in progress... stay tuned!
  
@@ -41,6 +41,12 @@ Using eth0 as network interface and XXX.XXX.XXX.XXX as its IP address...
 
 [*] Started 30 seconds of both passive and active discovery...
 
+================================================================================
+[*] Total detected devices: 1
+
+	XXX.XXX.XXX.XX
+
+================================================================================
 [*] Active discovery's results:
 
 DEVICE #1:
@@ -48,7 +54,7 @@ DEVICE #1:
 	--------------------------------------------------
 	Serial Number             xxxxxxxxxxxxxxxxxxxxx
 	Description               DS-2DE4220IW-D
-	MAC                       XX-XX-XX-XX-XX-XX
+	MAC                       XX:XX:XX:XX:XX:XX
 	IP                        XXX.XXX.XXX.XX
 	DHCP in use               false     
 	Software Version          V5.4.3build 160810
@@ -58,7 +64,11 @@ DEVICE #1:
 	Password Reset Ability    true      
 
 
-[*] Passive discovery didn't find any device.
+================================================================================
+[*] Passive discovery's results:
+
+DEVICE #1:
+	Detected a device with ip address XXX.XXX.XXX.XX and MAC address XX:XX:XX:XX:XX:XX.
 ```
 
 **_This project is for educational purposes only. Don't use it for illegal activities. I don't support nor condone illegal or unethical actions and I can't be held responsible for possible misuse of this software._**

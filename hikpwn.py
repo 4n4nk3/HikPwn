@@ -4,11 +4,43 @@
 # Written By Ananke: https://github.com/4n4nk3
 # TODO: Add detection and exploitation capabilities for ICSA-17-124-01.
 import argparse
+from functools import total_ordering
+from collections import OrderedDict
+from ipaddress import ip_address, IPv4Address
 from sys import exit
 from time import sleep
+from typing import Dict, Any
 
 from lxml import etree
 from scapy.all import *
+
+
+@total_ordering
+class HikDevice:
+    """Hikvision Device Object to hold the information that we acquire about it.\n"""
+    def __init__(self, ip, description=None, serial_number=None, mac=None, ip_mask=None, ip_gateway=None, dhcp=None,
+                    software_version=None, dsp_version=None, boot_time=None, activation_status=None,
+                    password_reset_ability=None, arp_req_target=None):
+        self.ip = ip if isinstance(ip, IPv4Address) else ip_address(ip)
+        self.description = description
+        self.serial_number = serial_number
+        self.mac = mac
+        self.ip_mask = ip_mask
+        self.ip_gateway = ip_gateway
+        self.dhcp = dhcp
+        self.software_version = software_version
+        self.dsp_version = dsp_version
+        self.boot_time = boot_time
+        self.activation_status = activation_status
+        self.password_reset_ability = password_reset_ability
+        self.arp_req_target = arp_req_target
+
+    def __eq__(self, other):
+        return self.ip() == other.ip()
+
+    def __lt__(self, other):
+        return self.ip() < other.ip()
+
 
 HIK_KNOWN_HW = {
     'c4:2f:90': 'Hangzhou Hikvision Digital Technology Co.,Ltd.',
@@ -23,8 +55,8 @@ HIK_KNOWN_HW = {
     '18:68:cb': 'Hangzhou Hikvision Digital Technology Co.,Ltd.'
 }
 
-DETECTED_PASSIVE = set()
-DETECTED_ACTIVE = defaultdict(dict)
+DETECTED_PASSIVE: Dict[str, HikDevice] = {}
+DETECTED_ACTIVE: Dict[str, HikDevice] = {}
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -45,8 +77,9 @@ def check_pkt_passive(pkt):
     """Function executed to check if passively sniffed ARP packets come from Hikvision devices.\n"""
     global DETECTED_PASSIVE
     if pkt[ARP].hwsrc[:8] in HIK_KNOWN_HW:
-        DETECTED_PASSIVE.add(
-            'Request: {} with HWD-ID {} is asking about {}'.format(pkt[ARP].psrc, pkt[ARP].hwsrc, pkt[ARP].pdst))
+        ip = pkt[ARP].psrc
+        if ip not in DETECTED_PASSIVE:
+            DETECTED_PASSIVE[ip] = HikDevice(ip=ip, mac=pkt[ARP].hwsrc, arp_req_target=pkt[ARP].pdst)
 
 
 def check_pkt_active(pkt):
@@ -54,20 +87,23 @@ def check_pkt_active(pkt):
     global DETECTED_ACTIVE
     try:
         response = pkt[UDP].load
-        xmlroot = etree.fromstring(response)
-        device_description = xmlroot.find('DeviceDescription').text
-        device_serial_number = xmlroot.find('DeviceSN').text[len(device_description):]
-        if device_serial_number not in DETECTED_ACTIVE:
-            DETECTED_ACTIVE[device_serial_number]['Serial Number'] = device_serial_number
-            DETECTED_ACTIVE[device_serial_number]['Description'] = device_description
-            DETECTED_ACTIVE[device_serial_number]['MAC'] = xmlroot.find('MAC').text
-            DETECTED_ACTIVE[device_serial_number]['IP'] = xmlroot.find('IPv4Address').text
-            DETECTED_ACTIVE[device_serial_number]['DHCP in use'] = xmlroot.find('DHCP').text
-            DETECTED_ACTIVE[device_serial_number]['Software Version'] = xmlroot.find('SoftwareVersion').text
-            DETECTED_ACTIVE[device_serial_number]['DSP Version'] = xmlroot.find('DSPVersion').text
-            DETECTED_ACTIVE[device_serial_number]['Boot Time'] = xmlroot.find('BootTime').text
-            DETECTED_ACTIVE[device_serial_number]['Activation Status'] = xmlroot.find('Activated').text
-            DETECTED_ACTIVE[device_serial_number]['Password Reset Ability'] = xmlroot.find('PasswordResetAbility').text
+        check_xmlroot = etree.fromstring(response)
+        ip = check_xmlroot.find('IPv4Address').text
+        description = check_xmlroot.find('DeviceDescription').text
+        if ip not in DETECTED_ACTIVE:
+            DETECTED_ACTIVE[ip] = HikDevice(ip=ip,
+                                            description=description,
+                                            serial_number=check_xmlroot.find('DeviceSN').text[len(description):],
+                                            mac=check_xmlroot.find('MAC').text.replace('-', ':'),
+                                            ip_mask=check_xmlroot.find('IPv4SubnetMask').text,
+                                            ip_gateway=check_xmlroot.find('IPv4Gateway').text,
+                                            dhcp=check_xmlroot.find('DHCP').text,
+                                            software_version=check_xmlroot.find('SoftwareVersion').text,
+                                            dsp_version=check_xmlroot.find('DSPVersion').text,
+                                            boot_time=check_xmlroot.find('BootTime').text,
+                                            activation_status=check_xmlroot.find('Activated').text,
+                                            password_reset_ability=check_xmlroot.find('PasswordResetAbility').text
+                                            )
     except Exception as exception:
         print(exception)
         print('[!] Error: in check_pkt_active')
@@ -87,7 +123,7 @@ def passive_detect():
 
 def active_detect_by_probe():
     """Passively sniff for UDP packets sent by Hikvision devices in response to specific packet probes.\n"""
-    wire_filter = 'udp and port 37020 and host ' + args.address + ' and not host 239.255.255.250'
+    wire_filter = 'udp and port 37020 and not host 239.255.255.250'
     try:
         sniff(filter=wire_filter, iface=args.interface, prn=check_pkt_active, store=0, timeout=30)
     except Exception as exception:
@@ -136,21 +172,49 @@ if args.active is True:
 # Wait for THREAD to finish in order not to loose any result by printing them before their capture
 THREAD1.join()
 
-# Printing results
-if args.active is True:
-    if not DETECTED_ACTIVE and not DETECTED_PASSIVE:
-        print('\n\n[*] Both passive and active discovery didn\'t find any device.')
-    elif DETECTED_ACTIVE:
-        print('\n\n[*] Active discovery\'s results:')
-        for number, device in enumerate(DETECTED_ACTIVE):
-            print(f'\nDEVICE #{number + 1}:\n\t{"LABEL":<25} {"DATA":<10}\n\t{50 * "-"}')
-            # List comprehension to print results in a table like format
-            [print(f'\t{label:<25} {DETECTED_ACTIVE[device][label]:<10}') for label in DETECTED_ACTIVE[device]]
-    else:
-        print('\n\n[*] Active discovery didn\'t find any device.')
+# Sorting devices
+DETECTED_ACTIVE = OrderedDict(sorted(DETECTED_ACTIVE.items()))
+DETECTED_PASSIVE = OrderedDict(sorted(DETECTED_PASSIVE.items()))
 
-if DETECTED_PASSIVE:
-    print('\n\n[*] Passive discovery\'s results:\n')
-    print(*DETECTED_PASSIVE, sep='\n')  # Object expansion
-elif args.active is not True or DETECTED_ACTIVE:
-    print('\n\n[*] Passive discovery didn\'t find any device.')
+# Printing results
+print(f'\n{80 * "="}')
+if not DETECTED_ACTIVE and not DETECTED_PASSIVE:
+    print('[*] Both passive and active discovery didn\'t find any device.')
+else:
+    if DETECTED_PASSIVE or DETECTED_ACTIVE:
+        # Create a sorted list of IPs eliminating duplicates by using a set())
+        total = sorted(set().union(
+            [DETECTED_ACTIVE[device].ip for device in DETECTED_ACTIVE],
+            [DETECTED_PASSIVE[device].ip for device in DETECTED_PASSIVE])
+        )
+        print(f'[*] Total detected devices: {len(total)}\n')
+        for device in total:
+            print(f'\t{device}')
+
+    print(f'\n\n{80 * "="}')
+    if args.active is True:
+        if DETECTED_ACTIVE:
+            print('[*] Active discovery\'s results:')
+            for number, device in enumerate(DETECTED_ACTIVE):
+                print(f'\nDEVICE #{number + 1}:\n\t{"LABEL":<25} {"DATA":<10}\n\t{50 * "-"}')
+                for attribute, value in DETECTED_ACTIVE[device].__dict__.items():
+                    if value is not None:
+                        try:
+                            print(f'\t{attribute:<25} {value:<10}')
+                        except TypeError as err:
+                            if attribute == 'ip':
+                                print(f'\t{attribute:<25} {str(value):<10}')
+                            else:
+                                print('Unexpected exception!')
+                                raise
+        else:
+            print('[*] Active discovery didn\'t find any device.')
+
+    print(f'\n\n{80 * "="}')
+    if DETECTED_PASSIVE:
+        print('[*] Passive discovery\'s results:')
+        for number, device in enumerate(DETECTED_PASSIVE):
+            print(f'\nDEVICE #{number + 1}:')
+            print(f'\tDetected a device with ip address {DETECTED_PASSIVE[device].ip} and MAC address {DETECTED_PASSIVE[device].mac}.')
+    elif args.active is not True or DETECTED_ACTIVE:
+        print('[*] Passive discovery didn\'t find any device.')
