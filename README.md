@@ -15,16 +15,19 @@ pip install -r requirements.txt
 ### Functions and characteristics:
  - [x] Passive discovery of Hikvision devices.
  - [x] Active discovery and enumeration of Hikvision devices via UDP UPNP probing.
+ - [x] Detection and exploitation capabilities for ICSA-17-124-01 leading to admin level access.
+ - [x] Save enumerated data to './log.txt'.
 
  > Work in progress... stay tuned!
  
 #### TODO:
 
-* Add detection and exploitation capabilities for ICSA-17-124-01.
+* Add option to skip discovery and only scan a specified IP for ICSA-17-124-01.
+* Testing with more devices.
 
 ### Help:
 ```
-usage: hikpwn.py [-h] --interface INTERFACE --address ADDRESS [--active]
+usage: hikpwn.py [-h] --interface INTERFACE --address ADDRESS [--active]  [--ICSA_17_124_01]
 
 HikPwn, a simple scanner for Hikvision devices with basic vulnerability scanning capabilities written in Python 3.8. by Ananke: https://github.com/4n4nk3.
 
@@ -33,6 +36,7 @@ optional arguments:
   --interface INTERFACE the network interface to use
   --address ADDRESS     the ip address of the selected network interface
   --active              enable "active" discovery
+  --ICSA_17_124_01      enable ICSA-17-124-01 detection on discovered devices
 ```
 
 ### Censored preview:
@@ -69,6 +73,25 @@ DEVICE #1:
 
 DEVICE #1:
 	Detected a device with ip address XXX.XXX.XXX.XX and MAC address XX:XX:XX:XX:XX:XX.
+
+
+================================================================================
+[*] Starting scan for ICSA-17-124-01...
+
+Checking if XXX.XXX.XXX.XX is vulnerable to ICSA-17-124-01 and if we can get a list of valid users present on the device...
+XXX.XXX.XXX.XX is vulnerable to ICSA_17_124_01. Recovered user list:
+    user_id                   1
+    user_name                 admin
+    priority                  high
+    user_level                Administrator
+
+Do you want to exploit the vulnerability and try to change admin's password? (y/n)
+    >>> y
+
+Enter a password composed by numbers and letters (8-12 characters):
+    >>> 
+
+Password change successful.
 ```
 
 **_This project is for educational purposes only. Don't use it for illegal activities. I don't support nor condone illegal or unethical actions and I can't be held responsible for possible misuse of this software._**
