@@ -318,7 +318,7 @@ else:
     elif ARGS.active is not True or DETECTED_ACTIVE:
         print('[*] Passive discovery didn\'t find any device.')
 
-    HOSTS: Dict[str, HikDevice] = {**DETECTED_PASSIVE, **DETECTED_ACTIVE}
+    HOSTS = {**DETECTED_PASSIVE, **DETECTED_ACTIVE}
 
     # ICS-17-124-01 exploitation
     if ARGS.ICSA_17_124_01 is True:
