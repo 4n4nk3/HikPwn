@@ -42,10 +42,10 @@ class HikDevice:
         self.user_list = set()
 
     def __eq__(self, other):
-        return (self.ip_a(), self.mac()) == (other.ip_a(), other.mac())
+        return (self.ip_a, self.mac) == (other.ip_a, other.mac)
 
     def __lt__(self, other):
-        return self.ip_a() < other.ip_a()
+        return self.ip_a < other.ip_a
 
 
 @total_ordering
@@ -59,10 +59,10 @@ class HikUser:
         self.user_level = user_level
 
     def __eq__(self, other):
-        return (self.user_id(), self.user_name()) == (other.user_id(), other.user_name())
+        return (self.user_id, self.user_name) == (other.user_id, other.user_name)
 
     def __lt__(self, other):
-        return self.user_id() < other.user_id()
+        return self.user_id < other.user_id
 
     def __hash__(self):
         return hash((self.user_id, self.user_name, self.user_level))
