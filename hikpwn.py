@@ -42,7 +42,7 @@ class HikDevice:
         self.user_list = set()
 
     def __eq__(self, other):
-        return (self.ip_a(), self.mac()) == (other.ip_a(), self.mac())
+        return (self.ip_a(), self.mac()) == (other.ip_a(), other.mac())
 
     def __lt__(self, other):
         return self.ip_a() < other.ip_a()
