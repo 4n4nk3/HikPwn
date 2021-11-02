@@ -22,8 +22,9 @@ pip install -r requirements.txt
  
 #### TODO:
 
-* Add option to skip discovery and only scan a specified IP for ICSA-17-124-01.
-* Testing with more devices.
+- [ ] Add option to skip discovery and only scan a specified IP for ICSA-17-124-01.
+- [ ] Testing with more devices.
+- [ ] Add detection and exploitation capability for CVE-2021-36260.
 
 ### Help:
 ```
